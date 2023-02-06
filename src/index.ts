@@ -120,18 +120,32 @@ export async function handler(event: CustomEmailSenderTriggerEvent): Promise<Cus
         throw Error('Sendgrid API key not found');
     }
 
-    sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
-
-    const plainTextCode = await getPlainTextCode(event);
     const toEmail = (event.request.userAttributes as StringMap)['email'];
-    const userName = (event.request.userAttributes as StringMap)['name'];
-    const messageToSend: MailDataRequired | undefined = generateMessageToSend(event, plainTextCode, toEmail, userName);
+    if (toEmail == undefined) {
+        console.warn("email is not available in event.request.userAttributes");
+    } 
+    else {
+        sendgrid.setApiKey(process.env.SENDGRID_API_KEY);
 
-    if (messageToSend) {
-        console.info("Message to send:\n" + JSON.stringify(messageToSend, null, 2));
-        const response = await sendgrid.send(messageToSend);
-        console.info(`Response Code: ${response[0].statusCode}, Message-ID: ${response[0].headers['x-message-id']}, Body: ${response[0].body}}`);
+        const plainTextCode = await getPlainTextCode(event);
+        
+        let userName = (event.request.userAttributes as StringMap)['name'];
+        if (userName == undefined) {
+            const givenName = (event.request.userAttributes as StringMap)['given_name'];
+            const familyName = (event.request.userAttributes as StringMap)['family_name'];
+
+            userName = givenName + ' ' + familyName;
+        }
+    
+        const messageToSend: MailDataRequired | undefined = generateMessageToSend(event, plainTextCode, toEmail, userName);
+    
+        if (messageToSend) {
+            console.info("Message to send:\n" + JSON.stringify(messageToSend, null, 2));
+            const response = await sendgrid.send(messageToSend);
+            console.info(`Response Code: ${response[0].statusCode}, Message-ID: ${response[0].headers['x-message-id']}, Body: ${response[0].body}}`);
+        }    
     }
+
 
     return event;
 }
